@@ -28,4 +28,5 @@ public class Restaurant {
     private double rating;
     private double latitude;
     private double longitude;
+    private String address;
 }
