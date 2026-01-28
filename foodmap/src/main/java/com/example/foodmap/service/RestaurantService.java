@@ -17,7 +17,7 @@ public class RestaurantService {
         return restaurantMapper.findAll();
     }
 
-    public Restaurant getById(int id){
+    public Restaurant getById(Long id){
         return restaurantMapper.findById(id);
     }
 

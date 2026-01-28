@@ -1,42 +1,67 @@
 package com.example.foodmap.config;
 
+import com.example.foodmap.config.JwtAuthenticationFilter; // 確保這個 import 對應到您實際存放 Filter 的位置
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@Configuration //代表這是一個設定類別
-@EnableWebSecurity //啟用Spring Security的Web安全功能
-public class SecurityConfig implements WebMvcConfigurer { //實作WebMvcConfigurer介面代表我要加上一些MVC設定(CORS)
+import java.util.List;
 
-    //CORS設定(解決跨網域請求)
-    //這段是告訴Spring Boot我允許前端網站跨網域呼叫這些API
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")  // 允許所有 API 路徑
-                .allowedOrigins("http://localhost:3000","http://192.168.68.87:3000/") // 允許的前端網址
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 允許的 HTTP 方法
-                .allowedHeaders("*") // 允許所有 header
-                .allowCredentials(true); // 允許攜帶cookie 或 token
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    // 1. 修正變數名稱：首字母改為小寫，並移除錯誤的套件路徑前綴
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    // 2. 建構子注入
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
     }
 
-    //安全過濾器設定(Spring Security)
+    // 1. 建立一個專門的 CORS 設定 Bean
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // 允許的前端網址
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://192.168.68.87:3000"));
+        // 允許的方法
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        // 允許的標頭 (包含 Authorization)
+        configuration.setAllowedHeaders(List.of("*"));
+        // 允許攜帶憑證 (Cookie/Token)
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf().disable() //禁用CSRF(跨站請求偽造)，前後端分離不需要CSRF保護
-                .authorizeRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()  // LINE 登入接口開放匿名訪問
-                        .requestMatchers("/api/restaurants/**").permitAll()  // 開放餐廳 API 給所有人訪問
-                        .anyRequest().authenticated()  // 其他 API 需要身份認證
+                // 2. 告訴 Spring Security 使用上面的 CORS 設定
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                .csrf(csrf -> csrf.disable())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/restaurants/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll() // ★ 強制允許所有 OPTIONS 請求
+                        .anyRequest().authenticated()
                 )
-                .sessionManagement(sess -> sess
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)  // 不使用 Session，JWT 或其他方式驗證
-                );
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+
         return http.build();
     }
 }

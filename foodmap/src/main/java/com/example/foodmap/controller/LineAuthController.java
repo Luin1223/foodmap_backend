@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth") //REST API控制器，路徑開頭/api/auth
-@CrossOrigin//允許來自前端跨網域請求
+//@CrossOrigin//允許來自前端跨網域請求
 @RequiredArgsConstructor //自動生成建構子來注入下面final欄位
 public class LineAuthController {
 
